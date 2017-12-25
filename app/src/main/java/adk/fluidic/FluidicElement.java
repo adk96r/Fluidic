@@ -9,17 +9,21 @@ import android.support.animation.SpringForce;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.VelocityTracker;
+import android.view.animation.OvershootInterpolator;
 import android.widget.RelativeLayout;
 
 /**
  * ADK started crafting this at EPOCH 1514051586.
  */
 
-public class FluidicLayout extends RelativeLayout {
+public class FluidicElement extends RelativeLayout {
 
     private static final int HORIZONTAL = 0;
     private static final int VERTICAL = 1;
-    private static final float FLING_FRICTION = 1.1f;
+    private static final float FLING_FRICTION = 0.3f;
+    private static final float SPRING_DAMPING_RATIO = SpringForce.DAMPING_RATIO_LOW_BOUNCY;
+    private static final float SPRING_STIFFNESS = SpringForce.STIFFNESS_LOW;
+
     private boolean fluidityX = true;
     private boolean fluidityY = true;
     private SpringForce forceX, forceY;
@@ -31,12 +35,12 @@ public class FluidicLayout extends RelativeLayout {
     private VelocityTracker mVelocityTracker;
     private float curX, curY, lastTouchX, lastTouchY;
 
-    public FluidicLayout(Context context) {
+    public FluidicElement(Context context) {
         super(context);
         initialiseFluidity(context);
     }
 
-    public FluidicLayout(Context context, AttributeSet attrs) {
+    public FluidicElement(Context context, AttributeSet attrs) {
         super(context, attrs);
         initialiseFluidity(context);
     }
@@ -52,15 +56,12 @@ public class FluidicLayout extends RelativeLayout {
         post(new Runnable() {
             @Override
             public void run() {
-                setBounds(0, 0,
-                        screenSize.x - getWidth(),
-                        screenSize.y - getHeight());
+                setBounds(0, 0, screenSize.x, screenSize.y);
                 setupFlings();
                 setupSprings();
             }
         });
     }
-
 
 
     private void setupFlings() {
@@ -101,8 +102,8 @@ public class FluidicLayout extends RelativeLayout {
 
     private void setupSprings() {
 
-        forceX = new SpringForce().setStiffness(SpringForce.STIFFNESS_MEDIUM)
-                .setDampingRatio(SpringForce.DAMPING_RATIO_MEDIUM_BOUNCY);
+        forceX = new SpringForce().setStiffness(SPRING_STIFFNESS)
+                .setDampingRatio(SPRING_DAMPING_RATIO);
 
         springX = new SpringAnimation(this, DynamicAnimation.X)
                 .setSpring(forceX);
@@ -156,12 +157,23 @@ public class FluidicLayout extends RelativeLayout {
                 mVelocityTracker.addMovement(event);
 
                 if (fluidityX) {
+
+                    if (flingX.isRunning()){
+                        flingX.cancel();
+                    }
+
                     dX = event.getRawX() - lastTouchX;
                     curX += dX;
                     setX(curX);
                     lastTouchX = event.getRawX();
                 }
+
                 if (fluidityY) {
+
+                    if (flingY.isRunning()) {
+                         flingY.cancel();
+                    }
+
                     dY = event.getRawY() - lastTouchY;
                     curY += dY;
                     setY(curY);
@@ -182,16 +194,26 @@ public class FluidicLayout extends RelativeLayout {
                     mVelocityTracker.computeCurrentVelocity(1000);
 
                     if (fluidityX) {
+
+                        if (flingY.isRunning()) {
+                            flingX.cancel();
+                        }
+
                         float vX = mVelocityTracker.getXVelocity();
                         flingX.setStartValue(curX)
-                                .setStartVelocity(vX)
+                                .setStartVelocity(2 * vX)
                                 .start();
                     }
 
                     if (fluidityY) {
+
+                        if (flingY.isRunning()) {
+                            flingY.cancel();
+                        }
+
                         float vY = mVelocityTracker.getYVelocity();
                         flingY.setStartValue(curY)
-                                .setStartVelocity(vY)
+                                .setStartVelocity(2 * vY)
                                 .start();
                     }
 
@@ -219,10 +241,24 @@ public class FluidicLayout extends RelativeLayout {
 
 
     void setBounds(float left, float top, float right, float bottom) {
+
         this.left = left;
         this.top = top;
-        this.right = right;
-        this.bottom = bottom;
+        this.right = right - getWidth();
+        this.bottom = bottom - getHeight();
+
+        animate()
+                .x(top)
+                .y(top)
+                .setDuration(350)
+                .setInterpolator(new OvershootInterpolator())
+                .start();
+
+        curX = top;
+        curY = left;
+
+        setupSprings();
+        setupFlings();
     }
 
     boolean withinBounds(float value, int mode) {
@@ -237,8 +273,10 @@ public class FluidicLayout extends RelativeLayout {
     }
 
     private void springBackIntoBounds(int mode) {
+
         switch (mode) {
             case HORIZONTAL: {
+                flingX.cancel();
                 springX.cancel();
                 forceX.setFinalPosition(curX < left ? left : right);
                 springX.setSpring(forceX)
@@ -246,6 +284,7 @@ public class FluidicLayout extends RelativeLayout {
                 break;
             }
             case VERTICAL: {
+                flingY.cancel();
                 springY.cancel();
                 forceY.setFinalPosition(curY < top ? top : bottom);
                 springY.setSpring(forceY)

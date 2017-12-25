@@ -4,5 +4,7 @@
     <color name="colorPrimaryDark">#303F9F</color>
     <color name="colorAccent">#FF4081</color>
     <color name="green">#fdfa</color>
-    <color name="crimson">#DDD</color>
+    <color name="crimson">#DC143C</color>
+    <color name="cerulean_blue">#007BA7</color>
+    <color name="margin_color">#ddd</color>
 </resources>
